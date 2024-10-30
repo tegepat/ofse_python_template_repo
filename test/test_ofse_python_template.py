@@ -37,3 +37,97 @@ import filecmp
 
 ################################################################################
 # Functions
+
+def preptest():
+    """Prepare the test run."""
+    resfile = "./logmsgres.txt"
+    if os.path.exists(resfile):
+        os.remove(resfile)
+    open("./testdata/resempty.txt", "w").close()
+
+
+def test_shlex():
+    """Test the shlex funtionality used in the different test scenarios."""
+    # I want to write this
+    command = r'"(\S*):(\d+):(\d+): [iInNfFoO|wWaArRnNiInNgG|eErR{2}oOrR|nNoOtTeE]+: (\d+):( \S+)+" -d'
+
+    # command parsers want this
+    as_list = [
+        r"(\S*):(\d+):(\d+): [iInNfFoO|wWaArRnNiInNgG|eErR{2}oOrR|nNoOtTeE]+: (\d+):( \S+)+",
+        "-d",
+    ]
+
+    # shlex.split() does the work for me
+    assert shlex.split(command) == as_list
+
+
+test_cases = [
+    (
+        '"(\S*):(\d+):(\d+): [iInNfFoO|wWaArRnNiInNgG|eErR{2}oOrR|nNoOtTeE]+: (\d+):( \S+)+" -d',
+        "Regular expression list is ['(\\\\S*):(\\\\d+):(\\\\d+): [iInNfFoO|wWaArRnNiInNgG|eErR{2}oOrR|nNoOtTeE]+: (\\\\d+):( \\\\S+)+']",
+    ),  # only positional args
+    (
+        "./testdata/regexcont.txt -d",
+        "Regular expression list is ['^{\\\\S}+$\\n', '(\\\\S*):(\\\\d+):(\\\\d+): [iInNfFoO|wWaArRnNiInNgG|eErR{2}oOrR|nNoOtTeE]+: (\\\\d+):( \\\\S+)+']",
+    ),  # all normal args with regex in file
+]
+
+
+@pytest.mark.parametrize("command, expected_output", test_cases)
+def test_argparseValidArguments(capsys, command, expected_output):
+    """
+    Test function to test the script's normal behavior.
+
+    Parameters
+    ----------
+    capsys : pytest fixture
+        Captures the stdout and stderr output during the execution of test functions
+    command : str
+        String with input arguments
+    expected_output : str
+        The expected output of the program based on the command
+    """
+    preptest()
+    main(shlex.split(command))
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert expected_output in output
+
+
+test_cases_sys_exit = [
+    ("", "error: the following arguments are required: regex"),  # no args
+    ("'^{\S}+$' -g", "error: unrecognized arguments: -g"),  # wrong optional arg
+    (
+        "'^{\S}+$' -",
+        "error: unrecognized arguments: -",
+    ),  # non-valid optional arg
+    (
+        "'^(test+$'",
+        "error: the regular expression ^(test+$ throws an error",
+    ),  # the handed over regex is not compilable
+    (
+        "'^test)+$'",
+        "error: the regular expression ^test)+$ throws an error",
+    ),  # othe handed over regex is not compilable
+]
+
+
+@pytest.mark.parametrize("command, expected_output", test_cases_sys_exit)
+def test_main(capsys, command, expected_output):
+    """
+    Test function for checking the argparse functionality with SystemError.
+
+    Parameters
+    ----------
+    capsys : pytest fixture
+        Captures the stdout and stderr output during the execution of test functions
+    command : str
+        String with input arguments
+    expected_output : str
+        The expected output of the program based on the command
+    """
+    with pytest.raises(SystemExit):  # Expecting SystemExit due to argparse error
+        main(shlex.split(command))
+    captured = capsys.readouterr()  # Capture both stdout and stderr
+    output = captured.out + captured.err  # Combine stdout and stderr
+    assert expected_output in output
