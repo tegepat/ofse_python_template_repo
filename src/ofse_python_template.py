@@ -30,6 +30,7 @@ import logging.config
 
 from check_arguments import check_arguments
 
+
 ###################################################################################################
 # Variables (always in capitals)
 
